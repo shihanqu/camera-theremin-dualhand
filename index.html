@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Camera Theremin</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header>
+        <h1>Camera Theremin</h1>
+        <p>
+          Left hand controls pitch from a vertical antenna. Right hand controls volume from a horizontal antenna.
+          Both use inverse-square distance mapping.
+        </p>
+      </header>
+
+      <section class="controls">
+        <button id="startButton" type="button">Start Theremin</button>
+        <p id="status" role="status" aria-live="polite">Click start to enable camera and audio.</p>
+      </section>
+
+      <section class="stage">
+        <div class="video-wrap">
+          <video id="inputVideo" playsinline></video>
+          <canvas id="overlayCanvas"></canvas>
+        </div>
+        <div class="legend" aria-live="polite">
+          <span><i class="swatch left-hand"></i>Left hand (pitch)</span>
+          <span><i class="swatch right-hand"></i>Right hand (volume)</span>
+          <span><i class="swatch pitch-antenna"></i>Pitch antenna</span>
+          <span><i class="swatch volume-antenna"></i>Volume antenna</span>
+        </div>
+        <div class="readout" aria-live="polite">
+          <div>
+            <span class="label">Pitch</span>
+            <span id="pitchValue">-- Hz</span>
+          </div>
+          <div>
+            <span class="label">Volume</span>
+            <span id="volumeValue">-- %</span>
+          </div>
+          <div>
+            <span class="label">Left Hand</span>
+            <span id="leftHandState">Missing</span>
+          </div>
+          <div>
+            <span class="label">Right Hand</span>
+            <span id="rightHandState">Missing</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
