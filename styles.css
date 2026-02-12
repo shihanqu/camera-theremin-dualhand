@@ -5,8 +5,8 @@
   --text: #ebf6ff;
   --accent: #ffd166;
   --line: #66d9ff;
-  --left-hand-color: #44dcb0;
-  --right-hand-color: #ff8f5a;
+  --pitch-hand-color: #ff8f5a;
+  --volume-hand-color: #44dcb0;
   --pitch-antenna-color: #3dd5f3;
   --volume-antenna-color: #ffe08a;
 }
@@ -45,9 +45,60 @@ p {
 .controls {
   margin-top: 1.5rem;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 1rem;
   flex-wrap: wrap;
+}
+
+.play-mode {
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  min-width: 240px;
+}
+
+.play-mode legend {
+  padding: 0 0.3rem;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.play-mode label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-right: 0.9rem;
+  font-size: 0.9rem;
+}
+
+.play-mode input[type="radio"] {
+  accent-color: #ffd166;
+}
+
+.tuning {
+  min-width: 230px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  padding: 0.55rem 0.75rem;
+}
+
+.tuning label {
+  display: block;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+.tuning input[type="range"] {
+  width: 100%;
+  margin-top: 0.25rem;
+}
+
+#pitchFieldValue {
+  display: inline-block;
+  margin-top: 0.1rem;
+  font-size: 0.84rem;
+  color: var(--line);
 }
 
 button {
@@ -142,12 +193,12 @@ button:active {
   box-shadow: 0 0 10px rgba(255, 255, 255, 0.28);
 }
 
-.swatch.left-hand {
-  background: var(--left-hand-color);
+.swatch.pitch-hand {
+  background: var(--pitch-hand-color);
 }
 
-.swatch.right-hand {
-  background: var(--right-hand-color);
+.swatch.volume-hand {
+  background: var(--volume-hand-color);
 }
 
 .swatch.pitch-antenna {
@@ -171,23 +222,29 @@ button:active {
   font-size: 1.08rem;
 }
 
-#leftHandState,
-#rightHandState {
+#pitchHandState,
+#volumeHandState {
   font-weight: 700;
   font-size: 1.08rem;
 }
 
-#leftHandState.active {
-  color: var(--left-hand-color);
+#pitchHandState.active {
+  color: var(--pitch-hand-color);
 }
 
-#rightHandState.active {
-  color: var(--right-hand-color);
+#volumeHandState.active {
+  color: var(--volume-hand-color);
 }
 
-#leftHandState.missing,
-#rightHandState.missing {
+#pitchHandState.missing,
+#volumeHandState.missing {
   color: rgba(235, 246, 255, 0.68);
+}
+
+.technique {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  opacity: 0.88;
 }
 
 @media (max-width: 700px) {
@@ -200,6 +257,14 @@ button:active {
   }
 
   button {
+    width: 100%;
+  }
+
+  .play-mode {
+    width: 100%;
+  }
+
+  .tuning {
     width: 100%;
   }
 }

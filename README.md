@@ -8,9 +8,12 @@ https://shihanqu.github.io/camera-theremin-dualhand/
 
 ## Controls
 
-- Left hand: pitch (distance to vertical pitch antenna)
-- Right hand: volume (distance to horizontal volume antenna)
-- Uses inverse-square distance mapping for both controls
+- Right-handed mode (default): right hand = pitch, left hand = volume
+- Left-handed mode: left hand = pitch, right hand = volume
+- Pitch hand: closer to vertical antenna = higher pitch
+- Volume hand: closer to horizontal loop = quieter / mute
+- Inverse-square distance mapping for pitch and volume
+- Includes a `Pitch Field` slider (theremin-style pitch range tuning)
 
 ## Run Locally
 
