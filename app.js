@@ -380,23 +380,85 @@ function assignRoleHands(detections, config) {
     return { pitchHand: null, volumeHand: null };
   }
 
-  if (detections.length === 1) {
-    const one = detections[0];
-    if (one.pitchDistance <= one.volumeDistance) {
-      return { pitchHand: one, volumeHand: null };
+  const used = new Set();
+  let pitchHand = null;
+  let volumeHand = null;
+
+  function bestByLabel(targetLabel, distanceKey) {
+    let best = null;
+
+    for (let i = 0; i < detections.length; i += 1) {
+      if (used.has(i)) {
+        continue;
+      }
+
+      const detection = detections[i];
+      const exact = detection.label === targetLabel;
+      const partial = !exact && detection.label.includes(targetLabel);
+      const matchScore = exact ? 2 : partial ? 1 : 0;
+
+      if (matchScore === 0) {
+        continue;
+      }
+
+      if (
+        !best ||
+        matchScore > best.matchScore ||
+        (matchScore === best.matchScore && detection[distanceKey] < best.detection[distanceKey])
+      ) {
+        best = { index: i, detection, matchScore };
+      }
     }
-    return { pitchHand: null, volumeHand: one };
+
+    return best;
   }
 
-  // For mirrored webcam UX, assign by screen side so right hand -> pitch, left hand -> volume.
-  const sortedByX = [...detections].sort((a, b) => a.controlPoint.x - b.controlPoint.x);
-  const pitchOnScreenRight = config.pitchAntenna.x < config.volumeAntenna.x;
+  function bestByDistance(distanceKey) {
+    let best = null;
 
-  if (pitchOnScreenRight) {
-    return { pitchHand: sortedByX[0], volumeHand: sortedByX[sortedByX.length - 1] };
+    for (let i = 0; i < detections.length; i += 1) {
+      if (used.has(i)) {
+        continue;
+      }
+
+      const detection = detections[i];
+      if (!best || detection[distanceKey] < best.detection[distanceKey]) {
+        best = { index: i, detection };
+      }
+    }
+
+    return best;
   }
 
-  return { pitchHand: sortedByX[sortedByX.length - 1], volumeHand: sortedByX[0] };
+  const pitchLabelHit = bestByLabel(config.pitchLabel, "pitchDistance");
+  if (pitchLabelHit) {
+    pitchHand = pitchLabelHit.detection;
+    used.add(pitchLabelHit.index);
+  }
+
+  const volumeLabelHit = bestByLabel(config.volumeLabel, "volumeDistance");
+  if (volumeLabelHit) {
+    volumeHand = volumeLabelHit.detection;
+    used.add(volumeLabelHit.index);
+  }
+
+  if (!pitchHand) {
+    const nearestPitch = bestByDistance("pitchDistance");
+    if (nearestPitch) {
+      pitchHand = nearestPitch.detection;
+      used.add(nearestPitch.index);
+    }
+  }
+
+  if (!volumeHand) {
+    const nearestVolume = bestByDistance("volumeDistance");
+    if (nearestVolume) {
+      volumeHand = nearestVolume.detection;
+      used.add(nearestVolume.index);
+    }
+  }
+
+  return { pitchHand, volumeHand };
 }
 
 function drawResults(results) {
