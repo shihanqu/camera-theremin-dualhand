@@ -20,10 +20,11 @@ const pitchFieldValueEl = document.getElementById("pitchFieldValue");
 
 const ctx = canvasEl.getContext("2d");
 
-const MIN_FREQ = 110;
-const MAX_FREQ = 1318.51;
+const MIN_FREQ = 65.41; // C2
+const MAX_FREQ = 2093.0; // C7
 const MAX_GAIN = 0.38;
 const SMOOTHING = 0.2;
+const PITCH_LOG_CURVE = 14;
 
 const PITCH_HAND_COLOR = "#ff8f5a";
 const VOLUME_HAND_COLOR = "#44dcb0";
@@ -34,14 +35,15 @@ const HAND_MODES = {
   right: {
     pitchLabel: "right",
     volumeLabel: "left",
-    pitchAntenna: { x: 0.86, y1: 0.12, y2: 0.88 },
-    volumeAntenna: { x1: 0.06, x2: 0.38, y: 0.82 },
+    // Mirrored webcam view: lower x renders on the right side of screen.
+    pitchAntenna: { x: 0.14, y1: 0.12, y2: 0.88 },
+    volumeAntenna: { x1: 0.62, x2: 0.94, y: 0.82 },
   },
   left: {
     pitchLabel: "left",
     volumeLabel: "right",
-    pitchAntenna: { x: 0.14, y1: 0.12, y2: 0.88 },
-    volumeAntenna: { x1: 0.62, x2: 0.94, y: 0.82 },
+    pitchAntenna: { x: 0.86, y1: 0.12, y2: 0.88 },
+    volumeAntenna: { x1: 0.06, x2: 0.38, y: 0.82 },
   },
 };
 
@@ -148,6 +150,15 @@ function inverseSquareNormalized(distance, nearDistance, farDistance) {
   const nearStrength = 1 / (nearDistance * nearDistance);
   const farStrength = 1 / (farDistance * farDistance);
   return clamp((strength - farStrength) / (nearStrength - farStrength), 0, 1);
+}
+
+function distanceToPitchControl(distance, nearDistance, farDistance) {
+  const clamped = clamp(distance, nearDistance, farDistance);
+  const normalizedDistance = (clamped - nearDistance) / (farDistance - nearDistance);
+
+  // Log-style pitch field: broad movement for low notes, tighter movement near antenna.
+  const compressed = Math.log1p(PITCH_LOG_CURVE * normalizedDistance) / Math.log1p(PITCH_LOG_CURVE);
+  return 1 - compressed;
 }
 
 function pitchAnchorForPoint(point, antenna) {
@@ -440,7 +451,7 @@ function drawResults(results) {
   if (hasPitchHand) {
     const pitchAnchor = pitchAnchorForPoint(pitchHand.indexTip, config.pitchAntenna);
     const pitchDistance = distance(pitchHand.indexTip, pitchAnchor);
-    pitchControl = inverseSquareNormalized(
+    pitchControl = distanceToPitchControl(
       pitchDistance,
       PITCH_DISTANCE_RANGE.near,
       PITCH_DISTANCE_RANGE.far,
