@@ -30,6 +30,7 @@ const PITCH_HAND_COLOR = "#ff8f5a";
 const VOLUME_HAND_COLOR = "#44dcb0";
 const PITCH_ANTENNA_COLOR = "#3dd5f3";
 const VOLUME_ANTENNA_COLOR = "#ffe08a";
+const VIDEO_IS_MIRRORED = true;
 
 const HAND_MODES = {
   right: {
@@ -335,16 +336,31 @@ function drawHand(landmarks, color) {
 }
 
 function handednessLabel(handedness) {
+  function maybeMirrorLabel(label) {
+    if (!VIDEO_IS_MIRRORED) {
+      return label;
+    }
+
+    if (label === "left") {
+      return "right";
+    }
+    if (label === "right") {
+      return "left";
+    }
+    return label;
+  }
+
   if (!handedness) {
     return "";
   }
 
   if (Array.isArray(handedness)) {
-    return handedness[0]?.label?.toLowerCase() || "";
+    const label = handedness[0]?.label?.toLowerCase() || "";
+    return maybeMirrorLabel(label);
   }
 
   if (typeof handedness.label === "string") {
-    return handedness.label.toLowerCase();
+    return maybeMirrorLabel(handedness.label.toLowerCase());
   }
 
   return "";
