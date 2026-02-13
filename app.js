@@ -36,14 +36,14 @@ const HAND_MODES = {
     pitchLabel: "right",
     volumeLabel: "left",
     // Mirrored webcam view: lower x renders on the right side of screen.
-    pitchAntenna: { x: 0.14, y1: 0.12, y2: 0.88 },
-    volumeAntenna: { x1: 0.62, x2: 0.94, y: 0.82 },
+    pitchAntenna: { x: 0.08, y1: 0.1, y2: 0.9 },
+    volumeAntenna: { x1: 0.6, x2: 0.95, y: 0.88 },
   },
   left: {
     pitchLabel: "left",
     volumeLabel: "right",
-    pitchAntenna: { x: 0.86, y1: 0.12, y2: 0.88 },
-    volumeAntenna: { x1: 0.06, x2: 0.38, y: 0.82 },
+    pitchAntenna: { x: 0.92, y1: 0.1, y2: 0.9 },
+    volumeAntenna: { x1: 0.05, x2: 0.4, y: 0.88 },
   },
 };
 
@@ -179,6 +179,25 @@ function distance(point, anchor) {
   return Math.hypot(point.x - anchor.x, point.y - anchor.y);
 }
 
+function handCenter(landmarks) {
+  if (!landmarks || landmarks.length === 0) {
+    return null;
+  }
+
+  let sumX = 0;
+  let sumY = 0;
+
+  for (const landmark of landmarks) {
+    sumX += landmark.x;
+    sumY += landmark.y;
+  }
+
+  return {
+    x: sumX / landmarks.length,
+    y: sumY / landmarks.length,
+  };
+}
+
 function initAudio() {
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
   if (!AudioCtx) {
@@ -288,6 +307,20 @@ function drawGuide(point, anchor, color) {
   ctx.restore();
 }
 
+function drawControlPoint(point, color) {
+  const width = canvasEl.width;
+  const height = canvasEl.height;
+
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.shadowBlur = 12;
+  ctx.shadowColor = color;
+  ctx.beginPath();
+  ctx.arc(point.x * width, point.y * height, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawHand(landmarks, color) {
   window.drawConnectors(ctx, landmarks, window.HAND_CONNECTIONS, {
     color,
@@ -319,24 +352,23 @@ function handednessLabel(handedness) {
 
 function buildDetections(results, config) {
   const landmarksList = results.multiHandLandmarks || [];
-  const handednessList = results.multiHandedness || [];
 
   return landmarksList.map((landmarks, index) => {
-    const indexTip = landmarks[8];
+    const controlPoint = handCenter(landmarks);
     let pitchDistance = Number.POSITIVE_INFINITY;
     let volumeDistance = Number.POSITIVE_INFINITY;
 
-    if (indexTip) {
-      const pitchAnchor = pitchAnchorForPoint(indexTip, config.pitchAntenna);
-      const volumeAnchor = volumeAnchorForPoint(indexTip, config.volumeAntenna);
-      pitchDistance = distance(indexTip, pitchAnchor);
-      volumeDistance = distance(indexTip, volumeAnchor);
+    if (controlPoint) {
+      const pitchAnchor = pitchAnchorForPoint(controlPoint, config.pitchAntenna);
+      const volumeAnchor = volumeAnchorForPoint(controlPoint, config.volumeAntenna);
+      pitchDistance = distance(controlPoint, pitchAnchor);
+      volumeDistance = distance(controlPoint, volumeAnchor);
     }
 
     return {
       landmarks,
-      indexTip,
-      label: handednessLabel(handednessList[index]),
+      controlPoint,
+      label: handednessLabel(results.multiHandedness?.[index]),
       pitchDistance,
       volumeDistance,
     };
@@ -344,88 +376,27 @@ function buildDetections(results, config) {
 }
 
 function assignRoleHands(detections, config) {
-  let pitchHand = null;
-  let volumeHand = null;
-  const used = new Set();
-
-  for (let i = 0; i < detections.length; i += 1) {
-    if (detections[i].label.includes(config.pitchLabel)) {
-      pitchHand = detections[i];
-      used.add(i);
-      break;
-    }
+  if (detections.length === 0) {
+    return { pitchHand: null, volumeHand: null };
   }
 
-  for (let i = 0; i < detections.length; i += 1) {
-    if (used.has(i)) {
-      continue;
-    }
-
-    if (detections[i].label.includes(config.volumeLabel)) {
-      volumeHand = detections[i];
-      used.add(i);
-      break;
-    }
-  }
-
-  if (!pitchHand && !volumeHand && detections.length === 1) {
+  if (detections.length === 1) {
     const one = detections[0];
     if (one.pitchDistance <= one.volumeDistance) {
-      pitchHand = one;
-    } else {
-      volumeHand = one;
+      return { pitchHand: one, volumeHand: null };
     }
+    return { pitchHand: null, volumeHand: one };
   }
 
-  if ((!pitchHand || !volumeHand) && detections.length >= 2) {
-    let bestPitch = null;
-    let bestVolume = null;
-    let bestCost = Number.POSITIVE_INFINITY;
+  // For mirrored webcam UX, assign by screen side so right hand -> pitch, left hand -> volume.
+  const sortedByX = [...detections].sort((a, b) => a.controlPoint.x - b.controlPoint.x);
+  const pitchOnScreenRight = config.pitchAntenna.x < config.volumeAntenna.x;
 
-    for (let i = 0; i < detections.length; i += 1) {
-      for (let j = 0; j < detections.length; j += 1) {
-        if (i === j) {
-          continue;
-        }
-
-        const cost = detections[i].pitchDistance + detections[j].volumeDistance;
-        if (cost < bestCost) {
-          bestCost = cost;
-          bestPitch = detections[i];
-          bestVolume = detections[j];
-        }
-      }
-    }
-
-    if (!pitchHand) {
-      pitchHand = bestPitch;
-    }
-    if (!volumeHand) {
-      volumeHand = bestVolume;
-    }
+  if (pitchOnScreenRight) {
+    return { pitchHand: sortedByX[0], volumeHand: sortedByX[sortedByX.length - 1] };
   }
 
-  if (!pitchHand) {
-    pitchHand = [...detections].sort((a, b) => a.pitchDistance - b.pitchDistance)[0] || null;
-  }
-
-  if (!volumeHand) {
-    volumeHand = [...detections].sort((a, b) => a.volumeDistance - b.volumeDistance)[0] || null;
-  }
-
-  if (pitchHand && volumeHand && pitchHand === volumeHand && detections.length > 1) {
-    const alternatives = detections.filter((item) => item !== pitchHand);
-    const secondPitch = [...alternatives].sort((a, b) => a.pitchDistance - b.pitchDistance)[0];
-    const secondVolume = [...alternatives].sort((a, b) => a.volumeDistance - b.volumeDistance)[0];
-
-    if (secondVolume && secondVolume.volumeDistance < secondPitch.pitchDistance) {
-      volumeHand = secondVolume;
-    } else if (secondPitch) {
-      pitchHand = secondPitch;
-    }
-  }
-
-  return { pitchHand, volumeHand };
+  return { pitchHand: sortedByX[sortedByX.length - 1], volumeHand: sortedByX[0] };
 }
 
 function drawResults(results) {
@@ -441,37 +412,39 @@ function drawResults(results) {
   let pitchControl = smoothedPitchControl;
   let volumeProximity = smoothedVolumeProximity;
 
-  const hasPitchHand = Boolean(pitchHand?.indexTip);
-  const hasVolumeHand = Boolean(volumeHand?.indexTip);
+  const hasPitchHand = Boolean(pitchHand?.controlPoint);
+  const hasVolumeHand = Boolean(volumeHand?.controlPoint);
 
   if (pitchHand?.landmarks) {
     drawHand(pitchHand.landmarks, PITCH_HAND_COLOR);
+    drawControlPoint(pitchHand.controlPoint, PITCH_HAND_COLOR);
   }
 
   if (hasPitchHand) {
-    const pitchAnchor = pitchAnchorForPoint(pitchHand.indexTip, config.pitchAntenna);
-    const pitchDistance = distance(pitchHand.indexTip, pitchAnchor);
+    const pitchAnchor = pitchAnchorForPoint(pitchHand.controlPoint, config.pitchAntenna);
+    const pitchDistance = distance(pitchHand.controlPoint, pitchAnchor);
     pitchControl = distanceToPitchControl(
       pitchDistance,
       PITCH_DISTANCE_RANGE.near,
       PITCH_DISTANCE_RANGE.far,
     );
-    drawGuide(pitchHand.indexTip, pitchAnchor, PITCH_ANTENNA_COLOR);
+    drawGuide(pitchHand.controlPoint, pitchAnchor, PITCH_ANTENNA_COLOR);
   }
 
   if (volumeHand?.landmarks) {
     drawHand(volumeHand.landmarks, VOLUME_HAND_COLOR);
+    drawControlPoint(volumeHand.controlPoint, VOLUME_HAND_COLOR);
   }
 
   if (hasVolumeHand) {
-    const volumeAnchor = volumeAnchorForPoint(volumeHand.indexTip, config.volumeAntenna);
-    const volumeDistance = distance(volumeHand.indexTip, volumeAnchor);
+    const volumeAnchor = volumeAnchorForPoint(volumeHand.controlPoint, config.volumeAntenna);
+    const volumeDistance = distance(volumeHand.controlPoint, volumeAnchor);
     volumeProximity = inverseSquareNormalized(
       volumeDistance,
       VOLUME_DISTANCE_RANGE.near,
       VOLUME_DISTANCE_RANGE.far,
     );
-    drawGuide(volumeHand.indexTip, volumeAnchor, VOLUME_ANTENNA_COLOR);
+    drawGuide(volumeHand.controlPoint, volumeAnchor, VOLUME_ANTENNA_COLOR);
   }
 
   setHandState(pitchHandStateEl, hasPitchHand);
